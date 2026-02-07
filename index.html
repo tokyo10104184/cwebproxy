@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Single Screen Web Proxy</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      }
+      body {
+        margin: 0;
+        height: 100vh;
+        display: grid;
+        grid-template-rows: auto auto 1fr;
+        background: #0f172a;
+      }
+      .toolbar {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 0.5rem;
+        padding: 0.75rem;
+        border-bottom: 1px solid #334155;
+        background: #111827;
+      }
+      .toolbar input {
+        width: 100%;
+        border: 1px solid #475569;
+        border-radius: 0.5rem;
+        background: #020617;
+        color: #e2e8f0;
+        padding: 0.7rem 0.9rem;
+        font-size: 0.95rem;
+      }
+      .toolbar button {
+        border: 0;
+        border-radius: 0.5rem;
+        padding: 0 1rem;
+        font-weight: 600;
+        color: #e2e8f0;
+        background: #2563eb;
+        cursor: pointer;
+      }
+      iframe {
+        width: 100%;
+        height: 100%;
+        border: 0;
+        background: #f8fafc;
+      }
+      .hint {
+        color: #94a3b8;
+        font-size: 0.85rem;
+        padding: 0 0.75rem 0.5rem;
+        background: #111827;
+      }
+    </style>
+  </head>
+  <body>
+    <form id="proxy-form" class="toolbar">
+      <input
+        id="url-input"
+        name="query"
+        placeholder="URL または検索語句を入力 (例: https://example.com / cats)"
+        autocomplete="off"
+      />
+      <button type="submit">表示</button>
+    </form>
+    <div class="hint">同一画面で閲覧します。URL以外は検索として処理します。</div>
+    <iframe id="proxy-frame" title="Proxy content" sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-downloads"></iframe>
+
+    <script>
+      const form = document.getElementById('proxy-form');
+      const input = document.getElementById('url-input');
+      const frame = document.getElementById('proxy-frame');
+
+      function normalizeTarget(raw) {
+        const value = raw.trim();
+        if (!value) return '';
+        try {
+          const direct = new URL(value);
+          if (direct.protocol === 'http:' || direct.protocol === 'https:') {
+            return direct.toString();
+          }
+        } catch (_) {
+          try {
+            const inferred = new URL(`https://${value}`);
+            return inferred.toString();
+          } catch (_) {
+            // fall back to search
+          }
+        }
+        return `https://duckduckgo.com/?q=${encodeURIComponent(value)}`;
+      }
+
+      function loadTarget(raw) {
+        const target = normalizeTarget(raw);
+        if (!target) return;
+        input.value = target;
+        const proxied = `/api/proxy?url=${encodeURIComponent(target)}`;
+        frame.src = proxied;
+        const nextHash = `#${encodeURIComponent(target)}`;
+        if (location.hash !== nextHash) {
+          history.replaceState(null, '', nextHash);
+        }
+      }
+
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        loadTarget(input.value);
+      });
+
+      window.addEventListener('DOMContentLoaded', () => {
+        const fromHash = decodeURIComponent(location.hash.slice(1) || 'https://example.com');
+        input.value = fromHash;
+        loadTarget(fromHash);
+      });
+    </script>
+  </body>
+</html>
